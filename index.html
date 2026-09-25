@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compra Certa</title>
+
+<!-- Configurações PWA e Metadados -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#123524">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Compra Certa">
+
+<!-- Ícone para dispositivos Apple (opcional, mas recomendado) -->
+<link rel="apple-touch-icon" href="/icon-192.png">
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Registo do Service Worker com suporte a atualizações -->
+<script>
+if ('serviceWorker' in navigator) {
+window.addEventListener('load', () => {
+navigator.serviceWorker.register('/sw.js')
+.then(reg => {
+console.log('Service Worker registado com sucesso. Escopo:', reg.scope);
+
+// Verifica se há atualizações pendentes
+reg.onupdatefound = () => {
+const installingWorker = reg.installing;
+installingWorker.onstatechange = () => {
+if (installingWorker.state === 'installed') {
+if (navigator.serviceWorker.controller) {
+console.h("Nova versão disponível! Atualize a página.");
+}
+}
+};
+};
+})
+.catch(err => {
+console.error('Falha ao registar o Service Worker:', err);
+});
+});
+}
+</script>
+</body>
+</html>
