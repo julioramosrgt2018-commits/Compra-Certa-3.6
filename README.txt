@@ -1,4 +1,4 @@
-COMPRA CERTA 3.1
+COMPRA CERTA 3.6
 
 - Câmara traseira para leitura de código e captura de fotos.
 - Ler código usa Quagga2 exclusivamente para EAN/GTIN; não usa OCR e não preenche Nome.
