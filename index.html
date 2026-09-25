@@ -80,7 +80,7 @@
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }
-        th { color: var::text-muted; }
+        th { color: var(--text-muted); }
         
         #reader { width: 100%; max-height: 300px; background: #000; border-radius: 6px; overflow: hidden; margin-bottom: 10px; display: none; }
     </style>
@@ -142,7 +142,6 @@
                 </table>
                 <h3 style="margin-top: 15px; text-align: right;" id="totalCarrinhoTxt">Total: R$ 0,00</h3>
                 
-                <!-- Botões para finalizar compra descontando do saldo ou limpar -->
                 <div style="margin-top: 15px;">
                     <label style="font-size: 0.9rem; color: var(--accent);">Descontar total da compra de:</label>
                     <select id="cartaoDescontoInput">
@@ -200,13 +199,29 @@
             </div>
         </div>
 
-        <!-- ABA CUPOM -->
+        <!-- ABA CUPOM (Versão Completa com Captura por Câmera / Foto e Comparação) -->
         <div id="cupom" class="tab-content">
             <div class="card">
-                <h3>📷 OCR de Cupom Fiscal</h3>
-                <input type="file" accept="image/*" id="inputCupomFoto" onchange="lerCupom(event)">
-                <p id="statusOCR" style="margin-top: 10px; color: var(--text-muted);">Envie uma foto clara do cupom fiscal.</p>
-                <textarea id="resultadoOCR" style="width:100%; height:120px; margin-top:10px; background:#111; color:#0f0; padding:8px; border-radius:4px; font-family:monospace;" placeholder="Texto lido aparecerá aqui..."></textarea>
+                <h3>📷 Captura e Leitura de Cupom Fiscal</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Tire uma foto diretamente com a câmera do cupom fiscal ou selecione uma imagem da galeria para o sistema ler os itens e comparar com o carrinho.</p>
+                
+                <!-- Botão nativo que aciona a câmera do celular ou seletor de arquivos -->
+                <input type="file" accept="image/*" capture="environment" id="inputCupomFoto" style="display: none;" onchange="lerCupom(event)">
+                <button onclick="document.getElementById('inputCupomFoto').click()" class="secondary" style="background-var: var(--primary);">📸 Tirar Foto / Enviar Cupom</button>
+                
+                <p id="statusOCR" style="margin-top: 10px; color: var(--accent); font-weight: bold;"></p>
+                
+                <label style="margin-top: 15px; display: block;">Texto Extraído do Cupom:</label>
+                <textarea id="resultadoOCR" style="width:100%; height:100px; background:#111; color:#0f0; padding:8px; border-radius:4px; font-family:monospace;" placeholder="O texto do cupom aparecerá aqui após a leitura..."></textarea>
+                
+                <button onclick="compararCupomComCarrinho()" class="success" style="margin-top: 10px;">🔍 Comparar com o Carrinho</button>
+            </div>
+
+            <div class="card">
+                <h3>📊 Resultado da Comparação</h3>
+                <div id="resultadoComparacaoCupom">
+                    <p style="color: var(--text-muted);">Faça a leitura de um cupom e clique em comparar para verificar divergências com o carrinho.</p>
+                </div>
             </div>
         </div>
 
@@ -390,14 +405,47 @@
             if(!file) return;
             let status = document.getElementById('statusOCR');
             let resultado = document.getElementById('resultadoOCR');
-            status.innerText = "Lendo cupom fiscal via IA...";
+            status.innerText = "🔄 Processando imagem e lendo cupom via OCR...";
+            resultado.value = "";
             
             Tesseract.recognize(file, 'por').then(({ data: { text } }) => {
-                status.innerText = "Leitura concluída!";
+                status.innerText = "Leitura concluída com sucesso!";
                 resultado.value = text;
             }).catch(err => {
-                status.innerText = "Erro ao ler o cupom.";
+                status.innerText = "Erro ao ler a imagem do cupom.";
             });
+        }
+
+        function compararCupomComCarrinho() {
+            let textoCupom = document.getElementById('resultadoOCR').value.toLowerCase();
+            let containerDiv = document.getElementById('resultadoComparacaoCupom');
+            
+            if(!textoCupom.trim()) {
+                alert('Primeiro tire a foto de um cupom fiscal para efetuar a leitura.');
+                return;
+            }
+
+            if(carrinho.length === 0) {
+                containerDiv.innerHTML = `<p style="color:var(--danger)">O seu carrinho atual está vazio para comparação.</p>`;
+                return;
+            }
+
+            let html = `<table><thead><tr><th>Produto no Carrinho</th><th>Status no Cupom</th></tr></thead><tbody>`;
+            
+            carrinho.forEach(item => {
+                let nomeProd = item.produto.toLowerCase();
+                // Verifica se alguma palavra chave principal do produto consta no texto extraído do cupom
+                let encontrado = textoCupom.includes(nomeProd) || nomeProd.split(' ').some(palavra => palavra.length > 3 && textoCupom.includes(palavra));
+                
+                let statusBadge = encontrado 
+                    ? `<span style="color:var(--success); font-weight:bold;">✔ Encontrado</span>` 
+                    : `<span style="color:var(--danger); font-weight:bold;">✘ Não verificado no cupom</span>`;
+                
+                html += `<tr><td><strong>${item.produto}</strong><br><small style="color:var(--text-muted)">R$ ${item.preco.toFixed(2)}</small></td><td>${statusBadge}</td></tr>`;
+            });
+
+            html += `</tbody></table>`;
+            containerDiv.innerHTML = html;
         }
 
         let html5QrCode;
