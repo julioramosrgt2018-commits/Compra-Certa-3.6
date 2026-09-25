@@ -7,9 +7,8 @@
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#006644">
     
-    <!-- Bibliotecas de Leitura -->
+    <!-- Biblioteca de Leitura de Código de Barras -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
     <!-- Registo do Service Worker para permitir PWA -->
     <script>
@@ -83,6 +82,7 @@
         th { color: var(--text-muted); }
         
         #reader { width: 100%; max-height: 300px; background: #000; border-radius: 6px; overflow: hidden; margin-bottom: 10px; display: none; }
+        .preview-img { width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; border: 1px solid var(--border); margin-top: 10px; display: none; background: #000; }
     </style>
 </head>
 <body>
@@ -199,28 +199,25 @@
             </div>
         </div>
 
-        <!-- ABA CUPOM (Versão Completa com Captura por Câmera / Foto e Comparação) -->
+        <!-- ABA CUPOM (Exibição de Foto e Análise Visual) -->
         <div id="cupom" class="tab-content">
             <div class="card">
-                <h3>📷 Captura e Leitura de Cupom Fiscal</h3>
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Tire uma foto diretamente com a câmera do cupom fiscal ou selecione uma imagem da galeria para o sistema ler os itens e comparar com o carrinho.</p>
+                <h3>📷 Foto do Cupom Fiscal</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Tire uma fotografia clara do cupom fiscal para conferência visual lado a lado com os itens do carrinho.</p>
                 
-                <!-- Botão nativo que aciona a câmera do celular ou seletor de arquivos -->
-                <input type="file" accept="image/*" capture="environment" id="inputCupomFoto" style="display: none;" onchange="lerCupom(event)">
-                <button onclick="document.getElementById('inputCupomFoto').click()" class="secondary" style="background-var: var(--primary);">📸 Tirar Foto / Enviar Cupom</button>
+                <input type="file" accept="image/*" capture="environment" id="inputCupomFoto" style="display: none;" onchange="carregarFotoCupom(event)">
+                <button onclick="document.getElementById('inputCupomFoto').click()" class="secondary">📸 Tirar Foto do Cupom</button>
                 
-                <p id="statusOCR" style="margin-top: 10px; color: var(--accent); font-weight: bold;"></p>
-                
-                <label style="margin-top: 15px; display: block;">Texto Extraído do Cupom:</label>
-                <textarea id="resultadoOCR" style="width:100%; height:100px; background:#111; color:#0f0; padding:8px; border-radius:4px; font-family:monospace;" placeholder="O texto do cupom aparecerá aqui após a leitura..."></textarea>
-                
-                <button onclick="compararCupomComCarrinho()" class="success" style="margin-top: 10px;">🔍 Comparar com o Carrinho</button>
+                <!-- Imagem exibida limpa na tela -->
+                <img id="imgCupomPreview" class="preview-img" alt="Pré-visualização do Cupom">
             </div>
 
             <div class="card">
-                <h3>📊 Resultado da Comparação</h3>
-                <div id="resultadoComparacaoCupom">
-                    <p style="color: var(--text-muted);">Faça a leitura de um cupom e clique em comparar para verificar divergências com o carrinho.</p>
+                <h3>🔍 Análise e Conferência com o Carrinho</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Confira abaixo o resumo dos itens registrados no seu carrinho para verificação com o cupom fotografado:</p>
+                
+                <div id="resumoConferenciaCupom">
+                    <!-- Preenchido dinamicamente -->
                 </div>
             </div>
         </div>
@@ -241,6 +238,7 @@
             document.getElementById(tabId).classList.add('active');
             btn.classList.add('active');
             if(tabId === 'precos') carregarComparador();
+            if(tabId === 'cupom') renderizarConferenciaCupom();
         }
 
         let carrinho = JSON.parse(localStorage.getItem('cc_carrinho')) || [];
@@ -293,6 +291,7 @@
                 `;
             });
             document.getElementById('totalCarrinhoTxt').innerText = `Total: R$ ${totalGeral.toFixed(2)}`;
+            renderizarConferenciaCupom();
         }
 
         function removerItem(index) {
@@ -355,6 +354,36 @@
             document.getElementById('displayRefeicao').innerText = `R$ ${(beneficios.Refeicao || 0).toFixed(2)}`;
         }
 
+        function carregarFotoCupom(event) {
+            let file = event.target.files[0];
+            if(!file) return;
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let img = document.getElementById('imgCupomPreview');
+                img.src = e.target.result;
+                img.style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function renderizarConferenciaCupom() {
+            let container = document.getElementById('resumoConferenciaCupom');
+            if(carrinho.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted)">Nenhum item no carrinho para conferir.</p>`;
+                return;
+            }
+            let totalGeral = 0;
+            let html = `<table><thead><tr><th>Item Registrado</th><th>Qtd</th><th>Total</th></tr></thead><tbody>`;
+            carrinho.forEach(item => {
+                let sub = item.qtd * item.preco;
+                totalGeral += sub;
+                html += `<tr><td><strong>${item.produto}</strong><br><small style="color:var(--text-muted)">${item.mercado}</small></td><td>${item.qtd}</td><td>R$ ${sub.toFixed(2)}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            html += `<p style="margin-top: 10px; text-align: right; font-weight: bold; color: var(--accent);">Total Esperado: R$ ${totalGeral.toFixed(2)}</p>`;
+            container.innerHTML = html;
+        }
+
         function adicionarNaLista() {
             let item = document.getElementById('novoItemLista').value.trim();
             if(!item) return;
@@ -398,54 +427,6 @@
             validades.forEach(v => {
                 tbody.innerHTML += `<tr><td>${v.produto}</td><td>${v.data.split('-').reverse().join('/')}</td></tr>`;
             });
-        }
-
-        function lerCupom(event) {
-            let file = event.target.files[0];
-            if(!file) return;
-            let status = document.getElementById('statusOCR');
-            let resultado = document.getElementById('resultadoOCR');
-            status.innerText = "🔄 Processando imagem e lendo cupom via OCR...";
-            resultado.value = "";
-            
-            Tesseract.recognize(file, 'por').then(({ data: { text } }) => {
-                status.innerText = "Leitura concluída com sucesso!";
-                resultado.value = text;
-            }).catch(err => {
-                status.innerText = "Erro ao ler a imagem do cupom.";
-            });
-        }
-
-        function compararCupomComCarrinho() {
-            let textoCupom = document.getElementById('resultadoOCR').value.toLowerCase();
-            let containerDiv = document.getElementById('resultadoComparacaoCupom');
-            
-            if(!textoCupom.trim()) {
-                alert('Primeiro tire a foto de um cupom fiscal para efetuar a leitura.');
-                return;
-            }
-
-            if(carrinho.length === 0) {
-                containerDiv.innerHTML = `<p style="color:var(--danger)">O seu carrinho atual está vazio para comparação.</p>`;
-                return;
-            }
-
-            let html = `<table><thead><tr><th>Produto no Carrinho</th><th>Status no Cupom</th></tr></thead><tbody>`;
-            
-            carrinho.forEach(item => {
-                let nomeProd = item.produto.toLowerCase();
-                // Verifica se alguma palavra chave principal do produto consta no texto extraído do cupom
-                let encontrado = textoCupom.includes(nomeProd) || nomeProd.split(' ').some(palavra => palavra.length > 3 && textoCupom.includes(palavra));
-                
-                let statusBadge = encontrado 
-                    ? `<span style="color:var(--success); font-weight:bold;">✔ Encontrado</span>` 
-                    : `<span style="color:var(--danger); font-weight:bold;">✘ Não verificado no cupom</span>`;
-                
-                html += `<tr><td><strong>${item.produto}</strong><br><small style="color:var(--text-muted)">R$ ${item.preco.toFixed(2)}</small></td><td>${statusBadge}</td></tr>`;
-            });
-
-            html += `</tbody></table>`;
-            containerDiv.innerHTML = html;
         }
 
         let html5QrCode;
