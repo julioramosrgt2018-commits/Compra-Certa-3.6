@@ -33,6 +33,7 @@
             --text-muted: #9ca3af;
             --danger: #dc2626;
             --border: #333333;
+            --success: #16a34a;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-main); padding-bottom: 70px; }
@@ -69,6 +70,8 @@
         button:hover { background: var(--primary-hover); }
         button.danger { background: var(--danger); }
         button.danger:hover { background: #b91c1c; }
+        button.success { background: var(--success); }
+        button.success:hover { background: #15803d; }
         button.secondary { background: #374151; }
         button.secondary:hover { background: #4b5563; }
         
@@ -77,7 +80,7 @@
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 8px; text-align: left; border-bottom: 1px solid var(--border); }
-        th { color: var(--text-muted); }
+        th { color: var::text-muted; }
         
         #reader { width: 100%; max-height: 300px; background: #000; border-radius: 6px; overflow: hidden; margin-bottom: 10px; display: none; }
     </style>
@@ -110,7 +113,6 @@
             <div class="card">
                 <h3>📝 Registrar Item no Carrinho</h3>
                 <label>Nome do Supermercado / Estabelecimento:</label>
-                <!-- Campo de texto livre para digitar o nome real do local -->
                 <input type="text" id="supermercadoInput" placeholder="Ex: Supermercado São José">
 
                 <label>Produto / Especificação:</label>
@@ -139,7 +141,17 @@
                     <tbody id="tabelaCarrinho"></tbody>
                 </table>
                 <h3 style="margin-top: 15px; text-align: right;" id="totalCarrinhoTxt">Total: R$ 0,00</h3>
-                <button onclick="limparCarrinho()" class="danger">Limpar Carrinho</button>
+                
+                <!-- Botões para finalizar compra descontando do saldo ou limpar -->
+                <div style="margin-top: 15px;">
+                    <label style="font-size: 0.9rem; color: var(--accent);">Descontar total da compra de:</label>
+                    <select id="cartaoDescontoInput">
+                        <option value="Alimentação">Cartão Alimentação</option>
+                        <option value="Refeição">Cartão Refeição</option>
+                    </select>
+                    <button onclick="finalizarCompra()" class="success">✅ Finalizar Compra (Descontar Saldo)</button>
+                </div>
+                <button onclick="limparCarrinho()" class="danger" style="margin-top: 5px;">Limpar Carrinho</button>
             </div>
         </div>
 
@@ -270,6 +282,37 @@
 
         function removerItem(index) {
             carrinho.splice(index, 1);
+            salvarDados();
+            renderCarrinho();
+        }
+
+        function finalizarCompra() {
+            if(carrinho.length === 0) {
+                alert('O carrinho está vazio!');
+                return;
+            }
+
+            let totalGeral = carrinho.reduce((sum, item) => sum + (item.qtd * item.preco), 0);
+            let tipoCartao = document.getElementById('cartaoDescontoInput').value;
+
+            if(tipoCartao === 'Alimentação') {
+                if(beneficios.Alimentacao < totalGeral) {
+                    if(!confirm('Atenção: o saldo do Cartão Alimentação é menor que o total da compra. Deseja continuar mesmo assim?')) return;
+                }
+                beneficios.Alimentacao -= totalGeral;
+            } else {
+                if(beneficios.Refeicao < totalGeral) {
+                    if(!confirm('Atenção: o saldo do Cartão Refeição é menor que o total da compra. Deseja continuar mesmo assim?')) return;
+                }
+                beneficios.Refeicao -= totalGeral;
+            }
+
+            salvarDados();
+            atualizarDisplayBeneficios();
+            
+            alert(`Compra finalizada com sucesso! R$ ${totalGeral.toFixed(2)} descontados do Cartão ${tipoCartao}.`);
+            
+            carrinho = [];
             salvarDados();
             renderCarrinho();
         }
