@@ -105,7 +105,7 @@
         <!-- ABA COMPRA -->
         <div id="compra" class="tab-content active">
             <div class="card">
-                <h3>📷 Leitura de Código de Barras</h3>
+                <h3>📷 Leitura de Código de Barras & Validade</h3>
                 <div id="reader"></div>
                 <button onclick="startScanner()" class="secondary">Abrir Câmera Traseira ao Vivo</button>
             </div>
@@ -115,8 +115,14 @@
                 <label>Nome do Supermercado / Estabelecimento:</label>
                 <input type="text" id="supermercadoInput" placeholder="Ex: Supermercado São José">
 
-                <label>Produto / Especificação:</label>
+                <label>Código de Barras:</label>
+                <input type="text" id="codigoBarrasInput" placeholder="Escaneado ou digitado">
+
+                <label>Produto / Descrição:</label>
                 <input type="text" id="produtoInput" placeholder="Ex: Leite Integral 1L">
+
+                <label>Data de Validade (Opcional):</label>
+                <input type="date" id="validadeCompraInput">
                 
                 <div class="flex-row">
                     <div>
@@ -174,49 +180,40 @@
             </div>
         </div>
 
-        <!-- ABA LISTA -->
+        <!-- ABA LISTA (Base de Dados de Produtos Comprados e Validação) -->
         <div id="lista" class="tab-content">
             <div class="card">
-                <h3>📋 Planejamento de Compras</h3>
-                <input type="text" id="novoItemLista" placeholder="Item planejado...">
-                <button onclick="adicionarNaLista()">Adicionar à Lista</button>
-                <ul id="ulListaPlanejada" style="list-style: none; margin-top: 10px;"></ul>
+                <h3>📋 Lista de Compras Inteligente</h3>
+                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Selecione abaixo os itens da sua base de dados para planejar a ida ao mercado. Ao chegar lá, escaneie ou clique para validar o produto e enviá-lo diretamente ao carrinho.</p>
+                
+                <div id="baseDadosContainer">
+                    <!-- Preenchido com o histórico de compras -->
+                </div>
             </div>
         </div>
 
         <!-- ABA VALIDADE -->
         <div id="validade" class="tab-content">
             <div class="card">
-                <h3>📅 Controle de Validade</h3>
-                <input type="text" id="produtoValidade" placeholder="Nome do Produto">
-                <label>Data de Validade:</label>
-                <input type="date" id="dataValidadeInput">
-                <button onclick="adicionarValidade()">Salvar Validade</button>
-                <table style="margin-top: 15px;">
+                <h3>📅 Controlo de Validade</h3>
+                <table style="margin-top: 10px;">
                     <thead><tr><th>Produto</th><th>Vencimento</th></tr></thead>
                     <tbody id="tabelaValidade"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- ABA CUPOM (Apenas Botão de Câmera e Imagem do Cupom + Conferência) -->
+        <!-- ABA CUPOM (Com Conferência Atativa e Imagem do Cupom) -->
         <div id="cupom" class="tab-content">
             <div class="card">
                 <h3>📷 Fotografia do Cupom Fiscal</h3>
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Tire a fotografia do cupom fiscal para conferência visual lado a lado com os itens comprados.</p>
-                
-                <!-- Input invisível acionado pelo botão customizado -->
                 <input type="file" accept="image/*" capture="environment" id="inputCupomFoto" style="display: none;" onchange="carregarFotoCupom(event)">
                 <button onclick="document.getElementById('inputCupomFoto').click()" class="secondary">📸 Tirar Fotografia do Cupom</button>
-                
-                <!-- Imagem exibida limpa na caixa abaixo -->
                 <img id="imgCupomPreview" class="preview-img" alt="Imagem do Cupom Fiscal">
             </div>
 
             <div class="card">
-                <h3>🔍 Conferência com o Carrinho</h3>
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 10px;">Compare visualmente o cupom acima com os itens registados no seu carrinho:</p>
-                
+                <h3>🔍 Conferência Ativa com o Carrinho</h3>
                 <div id="resumoConferenciaCupom">
                     <!-- Preenchido dinamicamente -->
                 </div>
@@ -226,7 +223,7 @@
         <!-- ABA PREÇOS -->
         <div id="precos" class="tab-content">
             <div class="card">
-                <h3>📊 Comparador de Preços</h3>
+                <h3>📊 Comparador de Preços Ativo</h3>
                 <div id="comparadorContainer"></div>
             </div>
         </div>
@@ -240,23 +237,26 @@
             btn.classList.add('active');
             if(tabId === 'precos') carregarComparador();
             if(tabId === 'cupom') renderizarConferenciaCupom();
+            if(tabId === 'lista') renderizarBaseDadosLista();
         }
 
         let carrinho = JSON.parse(localStorage.getItem('cc_carrinho')) || [];
-        let listaPlanejada = JSON.parse(localStorage.getItem('cc_lista')) || [];
         let validades = JSON.parse(localStorage.getItem('cc_validades')) || [];
         let beneficios = JSON.parse(localStorage.getItem('cc_beneficios')) || { Alimentacao: 0, Refeicao: 0 };
+        let historicoProdutos = JSON.parse(localStorage.getItem('cc_historico')) || [];
 
         function salvarDados() {
             localStorage.setItem('cc_carrinho', JSON.stringify(carrinho));
-            localStorage.setItem('cc_lista', JSON.stringify(listaPlanejada));
             localStorage.setItem('cc_validades', JSON.stringify(validades));
             localStorage.setItem('cc_beneficios', JSON.stringify(beneficios));
+            localStorage.setItem('cc_historico', JSON.stringify(historicoProdutos));
         }
 
         function adicionarItem() {
             let mercado = document.getElementById('supermercadoInput').value.trim() || 'Supermercado Geral';
+            let codigo = document.getElementById('codigoBarrasInput').value.trim();
             let produto = document.getElementById('produtoInput').value.trim();
+            let validadeData = document.getElementById('validadeCompraInput').value;
             let qtd = parseInt(document.getElementById('qtdInput').value) || 1;
             let preco = parseFloat(document.getElementById('precoInput').value) || 0;
 
@@ -265,11 +265,29 @@
                 return;
             }
 
-            carrinho.push({ mercado, produto, qtd, preco });
+            carrinho.push({ mercado, codigo, produto, qtd, preco });
+
+            // Adicionar à validade se preenchida
+            if(validadeData) {
+                validades.push({ produto, data: validadeData });
+            }
+
+            // Atualizar base de dados histórica para a lista inteligente
+            let existente = historicoProdutos.find(p => p.produto.toLowerCase() === produto.toLowerCase());
+            if(!existente) {
+                historicoProdutos.push({ codigo, produto, precoSugestao: preco });
+            } else if(codigo && !existente.codigo) {
+                existente.codigo = codigo;
+            }
+
             salvarDados();
             renderCarrinho();
+            renderValidade();
 
+            // Limpar campos
             document.getElementById('produtoInput').value = '';
+            document.getElementById('codigoBarrasInput').value = '';
+            document.getElementById('validadeCompraInput').value = '';
             document.getElementById('precoInput').value = '';
             document.getElementById('qtdInput').value = '1';
         }
@@ -284,7 +302,7 @@
                 totalGeral += totalItem;
                 tbody.innerHTML += `
                     <tr>
-                        <td><strong>${item.produto}</strong><br><small style="color:var(--text-muted)">${item.mercado}</small></td>
+                        <td><strong>${item.produto}</strong><br><small style="color:var(--text-muted)">${item.mercado} ${item.codigo ? '• Cód: ' + item.codigo : ''}</small></td>
                         <td>${item.qtd}</td>
                         <td>R$ ${totalItem.toFixed(2)}</td>
                         <td><button onclick="removerItem(${index})" class="danger" style="padding:4px 8px; font-size:0.8rem;">X</button></td>
@@ -324,7 +342,6 @@
 
             salvarDados();
             atualizarDisplayBeneficios();
-            
             alert(`Compra finalizada com sucesso! R$ ${totalGeral.toFixed(2)} descontados do Cartão ${tipoCartao}.`);
             
             carrinho = [];
@@ -370,56 +387,56 @@
         function renderizarConferenciaCupom() {
             let container = document.getElementById('resumoConferenciaCupom');
             if(carrinho.length === 0) {
-                container.innerHTML = `<p style="color:var(--text-muted)">Nenhum item registado no carrinho para conferência.</p>`;
+                container.innerHTML = `<p style="color:var(--text-muted)">Nenhum item no carrinho para conferência com o cupom.</p>`;
                 return;
             }
             let totalGeral = 0;
-            let html = `<table><thead><tr><th>Item no Carrinho</th><th>Qtd</th><th>Total</th></tr></thead><tbody>`;
+            let html = `<table><thead><tr><th>Item no Carrinho</th><th>Qtd</th><th>Subtotal</th></tr></thead><tbody>`;
             carrinho.forEach(item => {
                 let sub = item.qtd * item.preco;
                 totalGeral += sub;
                 html += `<tr><td><strong>${item.produto}</strong><br><small style="color:var(--text-muted)">${item.mercado}</small></td><td>${item.qtd}</td><td>R$ ${sub.toFixed(2)}</td></tr>`;
             });
             html += `</tbody></table>`;
-            html += `<p style="margin-top: 10px; text-align: right; font-weight: bold; color: var(--accent);">Total Registrado: R$ ${totalGeral.toFixed(2)}</p>`;
+            html += `<p style="margin-top: 10px; text-align: right; font-weight: bold; color: var(--accent);">Total Conferido: R$ ${totalGeral.toFixed(2)}</p>`;
             container.innerHTML = html;
         }
 
-        function adicionarNaLista() {
-            let item = document.getElementById('novoItemLista').value.trim();
-            if(!item) return;
-            listaPlanejada.push(item);
-            salvarDados();
-            renderLista();
-            document.getElementById('novoItemLista').value = '';
-        }
-
-        function renderLista() {
-            let ul = document.getElementById('ulListaPlanejada');
-            ul.innerHTML = '';
-            listaPlanejada.forEach((item, index) => {
-                ul.innerHTML += `<li style="padding:6px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-                    <span>${item}</span>
-                    <button onclick="removerLista(${index})" class="danger" style="width:auto; padding:2px 8px; font-size:0.7rem;">Remover</button>
-                </li>`;
+        function renderizarBaseDadosLista() {
+            let container = document.getElementById('baseDadosContainer');
+            if(historicoProdutos.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted)">Ainda não há produtos na base de dados histórica. Faça compras e cadastre itens para gerarem histórico automático.</p>`;
+                return;
+            }
+            let html = `<table><thead><tr><th>Produto</th><th>Ação / Validar no Ato</th></tr></thead><tbody>`;
+            historicoProdutos.forEach((hp, index) => {
+                html += `<tr>
+                    <td><strong>${hp.produto}</strong><br><small style="color:var(--text-muted)">Cód: ${hp.codigo || 'Não registado'}</small></td>
+                    <td><button onclick="comprarItemHistorico(${index})" class="success" style="padding:6px 10px; font-size:0.8rem;">✔ Comprar / Validar</button></td>
+                </tr>`;
             });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
         }
 
-        function removerLista(index) {
-            listaPlanejada.splice(index, 1);
-            salvarDados();
-            renderLista();
-        }
+        function comprarItemHistorico(index) {
+            let hp = historicoProdutos[index];
+            let precoStr = prompt(`Informe o preço atual para "${hp.produto}":`, hp.precoSugestao || '0.00');
+            if(precoStr === null) return;
+            let preco = parseFloat(precoStr) || 0;
+            let mercado = prompt('Supermercado atual:', 'Supermercado Geral') || 'Supermercado Geral';
 
-        function adicionarValidade() {
-            let produto = document.getElementById('produtoValidade').value.trim();
-            let data = document.getElementById('dataValidadeInput').value;
-            if(!produto || !data) return;
-            validades.push({ produto, data });
+            // Validação de código de barras ou descrição simulada no ato
+            let codVerificacao = prompt('Confirme o Código de Barras do produto lido (ou deixe em branco):', hp.codigo || '');
+            if(codVerificacao && hp.codigo && codVerificacao.trim() !== hp.codigo.trim()) {
+                alert('Atenção: O código de barras lido difere do registado na base de dados!');
+            }
+
+            carrinho.push({ mercado, codigo: codVerificacao || hp.codigo, produto: hp.produto, qtd: 1, preco });
             salvarDados();
-            renderValidade();
-            document.getElementById('produtoValidade').value = '';
-            document.getElementById('dataValidadeInput').value = '';
+            renderCarrinho();
+            alert(`Item "${hp.produto}" adicionado ao carrinho com sucesso!`);
+            switchTab('compra', document.querySelector('.nav-tab'));
         }
 
         function renderValidade() {
@@ -440,9 +457,10 @@
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 100 } },
                 (decodedText) => {
-                    document.getElementById('produtoInput').value = `Código: ${decodedText}`;
+                    document.getElementById('codigoBarrasInput').value = decodedText;
                     html5QrCode.stop();
                     readerDiv.style.display = 'none';
+                    alert(`Código lido: ${decodedText}. Preencha o nome do produto e validade.`);
                 },
                 (err) => {}
             ).catch(err => {});
@@ -450,16 +468,26 @@
 
         function carregarComparador() {
             let container = document.getElementById('comparadorContainer');
-            if(carrinho.length === 0) {
-                container.innerHTML = `<p style="color:var(--text-muted)">Adicione itens no carrinho.</p>`;
+            if(carrinho.length === 0 && historicoProdutos.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted)">Adicione itens no carrinho ou tenha histórico para comparar preços.</p>`;
                 return;
             }
+            
+            // Unificar carrinho e histórico para gerar o comparador ativo
+            let baseTotal = [...carrinho];
             let precosPorProduto = {};
-            carrinho.forEach(item => {
+            
+            baseTotal.forEach(item => {
                 let prod = item.produto.toLowerCase();
                 if(!precosPorProduto[prod]) precosPorProduto[prod] = {};
                 precosPorProduto[prod][item.mercado] = item.preco;
             });
+
+            if(Object.keys(precosPorProduto).length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted)">Sem dados suficientes no carrinho atual para o comparador.</p>`;
+                return;
+            }
+
             let html = `<table><thead><tr><th>Produto</th><th>Melhor Preço / Mercado</th></tr></thead><tbody>`;
             for(let prod in precosPorProduto) {
                 let mercados = precosPorProduto[prod];
@@ -471,7 +499,6 @@
         }
 
         renderCarrinho();
-        renderLista();
         renderValidade();
         atualizarDisplayBeneficios();
     </script>
